@@ -5,8 +5,8 @@ use MT 3;
 use MT::Template::Context;
 
 use vars qw( $MYNAME $VERSION );
-$MYNAME = 'Translator';
-$VERSION = '0.01';
+$MYNAME = (split /::/, __PACKAGE__)[-1];
+$VERSION = '0.11';
 
 use base qw( MT::Plugin );
 my $plugin = __PACKAGE__->new({
@@ -18,38 +18,73 @@ my $plugin = __PACKAGE__->new({
     author_link => 'http://www.magicvox.net/',
     doc_link => 'http://www.magicvox.net/archive/2010/03101929/',
     description => <<HTMLHEREDOC,
-Translate the phrase with the user dictionary.
+<__trans phrase="Translate the phrase with the user dictionary.">
 HTMLHEREDOC
-    config_template => sub {
-        <<HTMLHEREDOC;
-<mtapp:setting
-    id="dictionary"
-    label="User Dictionary">
-<textarea name="dictionary"><TMPL_VAR NAME=DICTIONARY ESCAPE=HTML></textarea>
-</mtapp:setting>
-HTMLHEREDOC
-    },
+    config_template => \&_cb_config_template,
     settings => new MT::PluginSettings([
+        [ 'name_alias', { Default => undef } ],
         [ 'dictionary', { Default => undef } ],
     ]),
 });
 MT->add_plugin( $plugin );
 
+### Configuration template
+sub _cb_config_template {
+    my ($plugin, $param, $scope) = @_;
 
+    my $tmpl;
+    if ($scope eq 'system') {
+        $tmpl .= <<HTMLHEREDOC;
+<mtapp:setting
+    id="name_alias"
+    label="<__trans phrase="Name aliases">"
+    hint="<__trans phrase="separate with '|' (a vertical bar)">"
+    show_hint="1">
+<input type="text" name="name_alias" value="<TMPL_VAR NAME=NAME_ALIAS ESCAPE=HTML>" class="full-width" />
+</mtapp:setting>
+HTMLHEREDOC
+    }
 
+    $tmpl .= <<HTMLHEREDOC;
+<mtapp:setting
+    id="dictionary"
+    label="<__trans phrase="Dictionary">"
+    hint="<__trans phrase="separate with '|' (a vertical bar)">"
+    show_hint="1">
+<textarea name="dictionary" rows="10" class="full-width"><TMPL_VAR NAME=DICTIONARY ESCAPE=HTML></textarea>
+</mtapp:setting>
+HTMLHEREDOC
+    $tmpl;
+}
+
+### Global filter - translator
 MT::Template::Context->add_global_filter (lc $MYNAME => sub {
     my ($text, $args, $ctx) = @_;
 
-    my $blog = $ctx->stash('blog');
-    if (defined (my $dictionary = $plugin->get_config_value ('dictionary', $blog ? 'blog:'. $blog->id : 'system'))) {
-        foreach (split /[\r\n]/, $dictionary) {
-            my ($src, $dst) = split /\|/;
-            $src =~ s/^\s+|\s+$//g; next if $src !~ /.+/;
-            $dst =~ s/^\s+|\s+$//g;
-            $text =~ s/\Q$src\E/$dst/g;
+    # Name alias
+    my $name_alias = $plugin->get_config_value ('name_alias') || '';
+    my @name_alias = split /\s*\|\s*/, $name_alias;
+    for (0..$#name_alias) {
+        if ($args eq $name_alias[$_]) {
+            $args = $_ + 1; last;
         }
     }
 
+    # Translate
+    if (1 < $args) {
+        my $dictionary = $plugin->get_config_value ('dictionary') || '';
+        if (defined (my $blog = $ctx->stash ('blog'))) {
+            $dictionary .= "\n".
+                $plugin->get_config_value ('dictionary', 'blog:'. $blog->id) || '';
+        }
+        foreach (split /[\r\n]/, $dictionary) {
+            my @words = split /\s*\|\s*/;
+            my $src = quotemeta $words[0];
+            if (defined (my $dst = $words[$args-1])) {
+                $text =~ s/$src/$dst/g;
+            }
+        }
+    }
     $text;
 });
 
