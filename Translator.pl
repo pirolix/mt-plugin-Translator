@@ -3,13 +3,15 @@ package MT::Plugin::OMV::Translator;
 use strict;
 use MT 3;
 use MT::Template::Context;
+use MT::Request;
+use MT::Util;
 
 use vars qw( $MYNAME $VERSION );
 $MYNAME = (split /::/, __PACKAGE__)[-1];
-$VERSION = '0.11';
+$VERSION = '0.12';
 
 use base qw( MT::Plugin );
-my $plugin = __PACKAGE__->new({
+my $plugin = __PACKAGE__->new ({
     id => $MYNAME,
     key => $MYNAME,
     name => $MYNAME,
@@ -49,7 +51,7 @@ HTMLHEREDOC
 <mtapp:setting
     id="dictionary"
     label="<__trans phrase="Dictionary">"
-    hint="<__trans phrase="separate with '|' (a vertical bar)">"
+    hint="<__trans phrase="separate with '|' (a vertical bar) or tab">"
     show_hint="1">
 <textarea name="dictionary" rows="10" class="full-width"><TMPL_VAR NAME=DICTIONARY ESCAPE=HTML></textarea>
 </mtapp:setting>
@@ -63,7 +65,7 @@ MT::Template::Context->add_global_filter (lc $MYNAME => sub {
 
     # Name alias
     my $name_alias = $plugin->get_config_value ('name_alias') || '';
-    my @name_alias = split /\s*\|\s*/, $name_alias;
+    my @name_alias = split /\s*[\|\t]\s*/, $name_alias;
     for (0..$#name_alias) {
         if ($args eq $name_alias[$_]) {
             $args = $_ + 1; last;
@@ -73,17 +75,27 @@ MT::Template::Context->add_global_filter (lc $MYNAME => sub {
     # Translate
     if (1 < $args) {
         my $dictionary = $plugin->get_config_value ('dictionary') || '';
+        # Override with blog's dictionary
         if (defined (my $blog = $ctx->stash ('blog'))) {
             $dictionary .= "\n".
                 $plugin->get_config_value ('dictionary', 'blog:'. $blog->id) || '';
         }
-        foreach (split /[\r\n]/, $dictionary) {
-            my @words = split /\s*\|\s*/;
-            my $src = quotemeta $words[0];
-            if (defined (my $dst = $words[$args-1])) {
-                $text =~ s/$src/$dst/g;
+
+        # Generate dictionary
+        my $req = MT::Request->instance;
+        my $dic;
+        my $cache_key = __PACKAGE__. '::dictionary_'. MT::Util::perl_sha1_digest_hex ($dictionary);
+        if (!defined ($dic = $req->cache ($cache_key))) {
+            foreach (split /[\r\n]/, $dictionary) {
+                my @words = split /\s*[\|\t]\s*/;
+                $dic->{$words[0]} = $words[$args-1]
+                    if defined $words[$args-1];
             }
+            $req->cache ($cache_key, $dic);
         }
+
+        my $regex = join ('|', map { quotemeta } keys %$dic);
+        $text =~ s!($regex)!$dic->{$1}!g;
     }
     $text;
 });
