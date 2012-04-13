@@ -1,4 +1,4 @@
-package MT::Plugin::OMV::Translator;
+package MT::Plugin::OMV::Multilingual::Translator;
 
 use strict;
 use MT 3;
@@ -8,7 +8,7 @@ use MT::Util;
 
 use vars qw( $MYNAME $VERSION );
 $MYNAME = (split /::/, __PACKAGE__)[-1];
-$VERSION = '0.12';
+$VERSION = '0.121';
 
 use base qw( MT::Plugin );
 my $plugin = __PACKAGE__->new ({
@@ -19,11 +19,12 @@ my $plugin = __PACKAGE__->new ({
     author_name => 'Open MagicVox.net',
     author_link => 'http://www.magicvox.net/',
     doc_link => 'http://www.magicvox.net/archive/2010/03101929/',
+    plugin_link => 'http://lab.magicvox.net/trac/mt-plugins/wiki/Translator',
     description => <<HTMLHEREDOC,
 <__trans phrase="Translate the phrase with the user dictionary.">
 HTMLHEREDOC
     config_template => \&_cb_config_template,
-    settings => new MT::PluginSettings([
+    settings => new MT::PluginSettings ([
         [ 'name_alias', { Default => undef } ],
         [ 'dictionary', { Default => undef } ],
     ]),
