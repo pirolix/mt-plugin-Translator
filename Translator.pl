@@ -1,4 +1,5 @@
 package MT::Plugin::OMV::Multilingual::Translator;
+# $Id$
 
 use strict;
 use MT 3;
@@ -6,9 +7,10 @@ use MT::Template::Context;
 use MT::Request;
 use MT::Util;
 
-use vars qw( $MYNAME $VERSION );
-$MYNAME = (split /::/, __PACKAGE__)[-1];
-$VERSION = '0.121';
+use vars qw( $VENDOR $MYNAME $VERSION );
+($VENDOR, $MYNAME) = (split /::/, __PACKAGE__)[-2, -1];
+(my $revision = '$Rev$') =~ s/\D//g;
+$VERSION = '0.121'. ($revision ? ".$revision" : '');
 
 use base qw( MT::Plugin );
 my $plugin = __PACKAGE__->new ({
